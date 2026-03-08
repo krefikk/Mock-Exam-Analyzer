@@ -1,4 +1,4 @@
-const CACHE = 'yks-v2';
+const CACHE = 'yks-v3';
 const FILES = ['./index.html', './manifest.json', './icon-192.png'];
 
 self.addEventListener('install', e => {
