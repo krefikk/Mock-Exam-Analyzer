@@ -12,6 +12,7 @@
 <title>YKS Deneme Analizi</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.2/Sortable.min.js"></script>
 <style>
 :root{
   --bg:#0F1724;--s1:#1A2438;--s2:#1E2D45;--s3:#253350;
@@ -1113,6 +1114,7 @@ function saveSettings(){
 function renderDersAyarlar(){
   const el=document.getElementById('ders-list-ayarlar');
   if(!S.ders.length){el.innerHTML='<div class="empty"><div class="empty-icon">📚</div><div class="empty-text">Henüz ders yok</div></div>';return;}
+  
   el.innerHTML=S.ders.map(d=>`
     <div class="card" style="margin-bottom:14px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
@@ -1129,9 +1131,7 @@ function renderDersAyarlar(){
         ${d.topics.length
           ? d.topics.map((t,i)=>`
             <div class="topic-drag-item" data-idx="${i}" data-ders="${d.id}">
-              <span class="drag-handle" 
-                    onmousedown="makeDraggable(this)" 
-                    ontouchstart="dragTouchStart(event,this.parentElement)">⠿</span>
+              <span class="drag-handle" style="cursor:grab; padding-right:10px; color:var(--muted); font-size:18px;">⠿</span>
               <span style="flex:1;font-size:13px">${t}</span>
               <button class="del-btn" onclick="delTopic('${d.id}',${i})">✕</button>
             </div>`).join('')
@@ -1139,87 +1139,41 @@ function renderDersAyarlar(){
       </div>
     </div>`).join('');
 
-  // Desktop drag-and-drop
-  document.querySelectorAll('.topic-drag-list').forEach(list=>{
-    list.addEventListener('dragstart',e=>{
-      const item=e.target.closest('.topic-drag-item');if(!item)return;
-      item.classList.add('dragging');
-      e.dataTransfer.effectAllowed='move';
-      e.dataTransfer.setData('text/plain',item.dataset.idx+'|'+item.dataset.ders);
-    });
-    list.addEventListener('dragend',e=>{
-      const item=e.target.closest('.topic-drag-item');
-      if(item) {
-        item.classList.remove('dragging');
-        item.removeAttribute('draggable'); // Drag bitince draggable özelliğini kaldırıyoruz
+  // SortableJS ile pürüzsüz sürükle-bırak
+  document.querySelectorAll('.topic-drag-list').forEach(listEl => {
+    new Sortable(listEl, {
+      handle: '.drag-handle', // Sadece ⠿ ikonundan tutulabilir
+      animation: 200, // Akıcı kayma animasyonu
+      ghostClass: 'dragging', // Sürüklenen öğeye CSS stili uygular
+      onEnd: function (evt) {
+        const dId = evt.to.dataset.ders;
+        const d = S.ders.find(x => x.id === dId);
+        if (!d) return;
+
+        const fi = evt.oldIndex;
+        const ti = evt.newIndex;
+        
+        if(fi === ti) return; // Sıra değişmediyse çık
+
+        // Konunun yeni sırasını kaydet
+        const [moved] = d.topics.splice(fi, 1);
+        d.topics.splice(ti, 0, moved);
+        
+        // İlgili yanlış sayılarını da taşı (veri kayması olmasın)
+        Object.keys(S.yanlis[dId]||{}).forEach(dnId=>{
+          if(S.yanlis[dId][dnId]){
+            const[mv] = S.yanlis[dId][dnId].splice(fi, 1);
+            S.yanlis[dId][dnId].splice(ti, 0, mv);
+          }
+        });
+        
+        saveS();
+        if(S.curDersId === dId) renderTopics(); 
       }
-      document.querySelectorAll('.topic-drag-item').forEach(i=>i.classList.remove('drag-over'));
-    });
-    list.addEventListener('dragover',e=>{
-      e.preventDefault();
-      const item=e.target.closest('.topic-drag-item');
-      document.querySelectorAll('.topic-drag-item').forEach(i=>i.classList.remove('drag-over'));
-      if(item)item.classList.add('drag-over');
-    });
-    list.addEventListener('drop',e=>{
-      e.preventDefault();
-      const dataTransfer = e.dataTransfer.getData('text/plain');
-      if(!dataTransfer) return;
-      
-      const [fromIdx,fromDers]=dataTransfer.split('|');
-      const toItem=e.target.closest('.topic-drag-item');
-      if(!toItem||toItem.dataset.idx===fromIdx)return;
-      
-      const dId=fromDers;
-      const d=S.ders.find(x=>x.id===dId);if(!d)return;
-      const fi=+fromIdx,ti=+toItem.dataset.idx;
-      const [moved]=d.topics.splice(fi,1);d.topics.splice(ti,0,moved);
-      
-      // Yanlışları da taşı
-      Object.keys(S.yanlis[dId]||{}).forEach(dnId=>{
-        if(S.yanlis[dId][dnId]){const[mv]=S.yanlis[dId][dnId].splice(fi,1);S.yanlis[dId][dnId].splice(ti,0,mv);}
-      });
-      saveS();renderDersAyarlar();if(S.curDersId===dId)renderTopics();
     });
   });
 }
-// Touch drag state
-let _tDragItem=null,_tDragDers=null,_tDragIdx=null,_tClone=null,_tStartY=0;
-function dragTouchStart(e,el){
-  _tDragItem=el;_tDragDers=el.dataset.ders;_tDragIdx=+el.dataset.idx;
-  _tStartY=e.touches[0].clientY;
-  el.classList.add('dragging');
-  _tClone=el.cloneNode(true);
-  _tClone.style.cssText='position:fixed;opacity:.7;pointer-events:none;z-index:9999;left:'+el.getBoundingClientRect().left+'px;top:'+el.getBoundingClientRect().top+'px;width:'+el.offsetWidth+'px;background:var(--s3)';
-  document.body.appendChild(_tClone);
-}
-function dragTouchMove(e){
-  e.preventDefault();
-  if(!_tClone)return;
-  const dy=e.touches[0].clientY-_tStartY;
-  _tClone.style.transform='translateY('+dy+'px)';
-  const touch=e.touches[0];
-  document.querySelectorAll('.topic-drag-item').forEach(i=>i.classList.remove('drag-over'));
-  const under=document.elementFromPoint(touch.clientX,touch.clientY)?.closest('.topic-drag-item');
-  if(under&&under!==_tDragItem)under.classList.add('drag-over');
-}
-function dragTouchEnd(e,el){
-  if(_tClone){_tClone.remove();_tClone=null;}
-  el.classList.remove('dragging');
-  const touch=e.changedTouches[0];
-  const under=document.elementFromPoint(touch.clientX,touch.clientY)?.closest('.topic-drag-item');
-  document.querySelectorAll('.topic-drag-item').forEach(i=>i.classList.remove('drag-over'));
-  if(under&&under!==el&&under.dataset.ders===_tDragDers){
-    const d=S.ders.find(x=>x.id===_tDragDers);if(!d)return;
-    const fi=_tDragIdx,ti=+under.dataset.idx;
-    const[moved]=d.topics.splice(fi,1);d.topics.splice(ti,0,moved);
-    Object.keys(S.yanlis[_tDragDers]||{}).forEach(dnId=>{
-      if(S.yanlis[_tDragDers][dnId]){const[mv]=S.yanlis[_tDragDers][dnId].splice(fi,1);S.yanlis[_tDragDers][dnId].splice(ti,0,mv);}
-    });
-    saveS();renderDersAyarlar();if(S.curDersId===_tDragDers)renderTopics();
-  }
-  _tDragItem=_tDragDers=_tDragIdx=null;
-}
+
 function openKonuModal(dId){
   const d=S.ders.find(x=>x.id===dId);
   document.getElementById('modal-konu-title').innerHTML=`${d.name} — Konu Ekle <button class="modal-close" onclick="closeModal('modal-konu-ekle')">✕</button>`;
