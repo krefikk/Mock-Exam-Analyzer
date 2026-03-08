@@ -2,8 +2,6 @@
 
 **Mock Exam Analyzer** is a modern, offline-first Progressive Web App (PWA) designed to help students track their mock exam results, analyze their mistakes by topic, and generate actionable study tasks.
 
-**Live:** [(https://krefikk.github.io/Mock-Exam-Analyzer/)]
-
 ## Key Features
 
 * **PWA Support:** Install the app directly to your smartphone's or computer's home screen for a native app-like experience.
