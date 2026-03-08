@@ -27,11 +27,3 @@
 * **HTML5, CSS3, Vanilla JavaScript (ES6+):** Built entirely without heavy frameworks (no React, Vue, etc.) for lightning-fast performance and minimal resource usage.
 * **Chart.js:** For rendering responsive and dynamic data charts.
 * **Service Workers & Web App Manifest:** Configured for offline caching and PWA installation.
-
-## Local Development Setup
-
-If you want to run or modify this project locally:
-
-1. Clone this repository:
-   ```bash
-   git clone [https://github.com/YOUR_USERNAME/mock-exam-analyzer.git](https://github.com/YOUR_USERNAME/mock-exam-analyzer.git)
